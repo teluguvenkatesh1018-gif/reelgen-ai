@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Wand2, Upload, Loader2 } from 'lucide-react'
+import { Wand2, Upload, Loader2, Sparkles } from 'lucide-react'
 import api from '@/utils/api'
 import { cn } from '@/lib/utils'
 
@@ -49,10 +49,13 @@ const durations = [
 export default function CreateVideoPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [generatingScript, setGeneratingScript] = useState(false)
   const [error, setError] = useState('')
+  const [scriptError, setScriptError] = useState('')
   const [form, setForm] = useState({
     project_name: '',
     generation_mode: 'topic_to_video',
+    topic: '',
     script: '',
     language: 'english',
     style: 'realistic',
@@ -68,6 +71,33 @@ export default function CreateVideoPage() {
     form.generation_mode
   )
   const needsAudio = form.generation_mode === 'audio_image_to_video'
+  const showTopicField = ['topic_to_video', 'script_to_video', 'image_script_to_video'].includes(
+    form.generation_mode
+  )
+
+  const handleGenerateScript = async () => {
+    if (!form.topic.trim()) {
+      setScriptError('Please enter a topic first.')
+      return
+    }
+
+    setScriptError('')
+    setGeneratingScript(true)
+
+    try {
+      const response = await api.post('/api/script/generate', {
+        topic: form.topic,
+        language: languages.find((l) => l.value === form.language)?.label || 'English',
+        duration: form.duration,
+      })
+      setForm({ ...form, script: response.data.script })
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } }
+      setScriptError(error.response?.data?.detail || 'Failed to generate script. Please try again.')
+    } finally {
+      setGeneratingScript(false)
+    }
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -103,7 +133,7 @@ export default function CreateVideoPage() {
             Create New Video
           </CardTitle>
           <CardDescription>
-            Configure your video project settings. AI generation will be available soon.
+            Configure your video project. Use AI to generate a script from your topic, then save.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -149,23 +179,70 @@ export default function CreateVideoPage() {
               </div>
             </div>
 
+            {/* Topic Field + Generate Script */}
+            {showTopicField && (
+              <div className="space-y-2">
+                <Label htmlFor="topic">Topic</Label>
+                <Input
+                  id="topic"
+                  placeholder="e.g. Banana Teaching Healthy Eating"
+                  value={form.topic}
+                  onChange={(e) => setForm({ ...form, topic: e.target.value })}
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateScript}
+                    disabled={generatingScript || !form.topic.trim()}
+                  >
+                    {generatingScript ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Script
+                      </>
+                    )}
+                  </Button>
+                  {generatingScript && (
+                    <span className="text-xs text-muted-foreground">
+                      AI is writing your script...
+                    </span>
+                  )}
+                </div>
+                {scriptError && (
+                  <p className="text-sm text-destructive">{scriptError}</p>
+                )}
+              </div>
+            )}
+
             {/* Script Input */}
             {needsScript && (
               <div className="space-y-2">
                 <Label htmlFor="script">
-                  {form.generation_mode === 'topic_to_video' ? 'Topic / Prompt' : 'Script'}
+                  {form.generation_mode === 'topic_to_video' ? 'Script' : 'Script'}
                 </Label>
                 <Textarea
                   id="script"
                   placeholder={
                     form.generation_mode === 'topic_to_video'
-                      ? 'Describe the topic for your video...'
+                      ? 'Enter your script or generate one from the topic above...'
                       : 'Enter your video script here...'
                   }
                   value={form.script}
                   onChange={(e) => setForm({ ...form, script: e.target.value })}
-                  rows={5}
+                  rows={8}
                 />
+                {form.script && (
+                  <p className="text-xs text-muted-foreground">
+                    You can edit the script above before saving.
+                  </p>
+                )}
               </div>
             )}
 
