@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.settings import settings
 from app.config.database import connect_to_mongo, close_mongo_connection
-from app.routes import auth, projects, users, ai_modules
+from app.routes import auth, projects, users, ai_modules, script
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -42,3 +42,4 @@ app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(users.router)
 app.include_router(ai_modules.router)
+app.include_router(script.router)
